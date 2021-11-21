@@ -10,15 +10,21 @@ import de.piobyte.dymoprint.service.hid.impl.PureJavaHidApiService;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.BitSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Slf4j
 public class PrintService {
 
     private final static String PERMISSION_ERROR = " 13";
+    private final static int BITS_IN_BYTE = 8;
 
     private final HidService hidService;
 
@@ -46,12 +52,18 @@ public class PrintService {
                 .collect(Collectors.toList());
     }
 
-    // TODO payload, not found/available and javadoc
-    public void printLabel(@NonNull String serialNumber, @NonNull Tape tape) throws IOException, InvalidParameterException {
-        // TODO use other model
-        int rows = 128;
-        byte[] labelData = new byte[rows * 8];
-        IntStream.range(0, rows * 8).forEach(value -> labelData[value] = 0xffffffff);
+    /**
+     * Print label.
+     *
+     * @param serialNumber serial number of label printer
+     * @param tape installed tape type
+     * @param label image of label
+     * @throws IOException communication exception
+     * @throws InvalidParameterException invalid parameter passed (e.g. unsupported tape)
+     * @throws PrinterNotFoundException printer not found
+     */
+    public void printLabel(@NonNull String serialNumber, @NonNull Tape tape,
+                           @NonNull BufferedImage label) throws IOException, InvalidParameterException, PrinterNotFoundException {
 
         var printerDevice = hidService.listPrinterDevices().stream()
                 .filter(hidDevice -> serialNumber.equalsIgnoreCase(hidDevice.getSerialNumber()))
@@ -65,11 +77,15 @@ public class PrintService {
                 throw new InvalidParameterException("Tape is not supported by printer!");
             }
 
-            // TODO check label height
+            var tapeHeight = printerDevice.get().getPrinterConfiguration().getSupportedTapes().get(tape) * BITS_IN_BYTE;
+            if (label.getHeight() != tapeHeight) {
+                log.error("Wrong image height! imageHeight={} targetHeight={}", label.getHeight(), tapeHeight);
+                throw new InvalidParameterException("Wrong image height!");
+            }
 
             try {
                 printerDevice.get().open();
-                printerDevice.get().write(tape, labelData);
+                printerDevice.get().write(tape, convertLabel(label));
                 printerDevice.get().close();
             } catch (IOException e) {
                 var errorMessage = e.getMessage();
@@ -81,7 +97,46 @@ public class PrintService {
                 }
                 throw e;
             }
+        } else {
+            throw new PrinterNotFoundException("Printer not found! serialNumber=" + serialNumber);
         }
+    }
+
+    private byte[] convertLabel(BufferedImage originalLabel) {
+        BufferedImage label = convertToBinaryImage(originalLabel);
+
+        var targetByteCount = (label.getHeight() * label.getWidth()) / BITS_IN_BYTE;
+        byte[] labelData = new byte[targetByteCount];
+
+        int bytePosition = 0;
+        BitSet bitSet = new BitSet(8);
+        for (int x = label.getWidth() - 1; x >= 0; x--) {
+            for (int y = 0; y < label.getHeight(); y++) {
+                int bitPosition = (BITS_IN_BYTE - 1) - (y % BITS_IN_BYTE);
+                bitSet.set(bitPosition, label.getRGB(x, y) != Color.WHITE.getRGB());
+
+                if (log.isDebugEnabled()) {
+                    log.debug("{},{}: {} (bitPosition:{})", x, y, label.getRGB(x, y) != Color.WHITE.getRGB(), bitPosition);
+                }
+
+                if (bitPosition == 0) {
+                    byte[] byteArray = bitSet.toByteArray();
+                    labelData[bytePosition++] = byteArray.length == 0 ? 0 : byteArray[0];
+                    bitSet.clear();
+                }
+            }
+        }
+        return labelData;
+    }
+
+    private BufferedImage convertToBinaryImage(BufferedImage originalLabel) {
+        BufferedImage binaryLabel = new BufferedImage(originalLabel.getWidth(), originalLabel.getHeight(),
+                BufferedImage.TYPE_BYTE_BINARY);
+        Graphics2D graphic = binaryLabel.createGraphics();
+        graphic.drawImage(originalLabel, 0, 0, Color.WHITE, null);
+        graphic.dispose();
+
+        return binaryLabel;
     }
 
     private Printer map(HidDevice hidDevice) {
@@ -89,6 +144,13 @@ public class PrintService {
                 .name(hidDevice.getPrinterConfiguration().getName())
                 .serialNumber(hidDevice.getSerialNumber())
                 .path(hidDevice.getPath())
+                .labelHeight(mapToLabelHeightInPixel(hidDevice.getPrinterConfiguration().getSupportedTapes()))
                 .build();
+    }
+
+    private Map<Tape, Integer> mapToLabelHeightInPixel(Map<Tape, Integer> supportedTapes) {
+        HashMap<Tape, Integer> heightMap = new HashMap<>();
+        supportedTapes.keySet().forEach(tape -> heightMap.put(tape, supportedTapes.get(tape) * BITS_IN_BYTE));
+        return heightMap;
     }
 }
