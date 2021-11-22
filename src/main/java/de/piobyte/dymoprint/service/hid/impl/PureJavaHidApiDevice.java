@@ -74,7 +74,15 @@ public class PureJavaHidApiDevice implements HidDevice {
             byteArrayOutputStream.write(new byte[]{CMD_ESC, CMD_C, (byte) printer.getColor()});
 
             // height
-            byteArrayOutputStream.write(new byte[]{CMD_ESC, CMD_B, 0});
+            byte height;
+            if (tape == Tape.D1_6_MM) {
+                height = 2;
+            } else if (tape == Tape.D1_9_MM) {
+                height = 1;
+            } else {
+                height = 0;
+            }
+            byteArrayOutputStream.write(new byte[]{CMD_ESC, CMD_B, height});
 
             // 2 empty lines
             printEmptyLines(2, byteArrayOutputStream);
@@ -82,7 +90,7 @@ public class PureJavaHidApiDevice implements HidDevice {
             // label
             byteArrayOutputStream.write(new byte[]{CMD_ESC, CMD_D, bytesPerLine});
             for (int i = 0; i < labelData.length; i++) {
-                if (i % 8 == 0) {
+                if (i % bytesPerLine == 0) {
                     byteArrayOutputStream.write(CMD_SYN);
                 }
                 byteArrayOutputStream.write(labelData[i]);

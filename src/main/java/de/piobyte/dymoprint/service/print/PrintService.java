@@ -70,6 +70,17 @@ public class PrintService {
     /**
      * Print label.
      *
+     * The passed image height needs to match the following value:
+     * <pre>
+     * +------------------+--------------+
+     * |  Label cassette  | Image height |
+     * +------------------+--------------+
+     * | D1 6mm  | 1/4 in | 32 pixel     |
+     * | D1 9mm  | 3/8 in | 48 pixel     |
+     * | D1 12mm | 1/2 in | 64 pixel     |
+     * +------------------+--------------+
+     * </pre>
+     *
      * @param serialNumber serial number of label printer
      * @param tape installed tape type
      * @param label image of label
