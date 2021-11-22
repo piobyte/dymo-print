@@ -15,6 +15,8 @@
  */
 package de.piobyte.dymoprint.service.print;
 
+import static org.junit.jupiter.api.Assertions.fail;
+
 import de.piobyte.dymoprint.printer.PrinterConfiguration;
 import de.piobyte.dymoprint.printer.Tape;
 import de.piobyte.dymoprint.printer.impl.LabelManagerPnPConfiguration;
@@ -22,7 +24,6 @@ import de.piobyte.dymoprint.printer.impl.LabelManagerPnPConfiguration;
 import lombok.extern.slf4j.Slf4j;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
@@ -48,11 +49,16 @@ class PrintServiceTest {
     }
 
     @Test
-    @Disabled
     void printLabel() throws IOException, InvalidParameterException, PrinterNotFoundException {
-        var printerDevice = service.listAvailablePrinters().stream().findFirst().get();
         BufferedImage image = ImageIO.read(getClass().getResourceAsStream("/test.png"));
-
-        service.printLabel(printerDevice.getSerialNumber(), Tape.D1_12_MM, image);
+        service.listAvailablePrinters()
+                .forEach(printer -> {
+                    try {
+                        service.printLabel(printer.getSerialNumber(), Tape.D1_12_MM, image);
+                    } catch (IOException | InvalidParameterException | PrinterNotFoundException e) {
+                        e.printStackTrace();
+                        fail();
+                    }
+                });
     }
 }
