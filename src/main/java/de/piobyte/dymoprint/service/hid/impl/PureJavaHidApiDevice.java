@@ -18,16 +18,17 @@ package de.piobyte.dymoprint.service.hid.impl;
 import de.piobyte.dymoprint.printer.PrinterConfiguration;
 import de.piobyte.dymoprint.printer.Tape;
 import de.piobyte.dymoprint.service.hid.HidDevice;
-
 import io.github.jna4usb.purejavahidapi.HidDeviceInfo;
 import io.github.jna4usb.purejavahidapi.PureJavaHidApi;
-
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.IntStream;
 
 @Slf4j
@@ -105,7 +106,9 @@ public class PureJavaHidApiDevice implements HidDevice {
             }
 
             byte[] rawData = byteArrayOutputStream.toByteArray();
-            pureJavaHidDevice.setOutputReport((byte) 0, rawData, rawData.length);
+            divideArray(rawData, 64).forEach(bytes -> {
+                pureJavaHidDevice.setOutputReport((byte) 0, bytes, bytes.length);
+            });
         }
     }
 
@@ -146,5 +149,18 @@ public class PureJavaHidApiDevice implements HidDevice {
             var command = new byte[]{CMD_ESC, CMD_A};
             pureJavaHidDevice.setOutputReport((byte) 0, command, command.length);
         }
+    }
+
+    private List<byte[]> divideArray(byte[] source, int chunkSize) {
+
+        List<byte[]> result = new ArrayList<byte[]>();
+        int start = 0;
+        while (start < source.length) {
+            int end = Math.min(source.length, start + chunkSize);
+            result.add(Arrays.copyOfRange(source, start, end));
+            start += chunkSize;
+        }
+
+        return result;
     }
 }
