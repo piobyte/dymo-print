@@ -93,3 +93,11 @@ You can use the tools __udev__ and __modeswitch__ to work with the LabelManager 
 4. Unplug the printer and reload udev service: `sudo udevadm control --reload`
 5. Done
 
+### Mac OS
+
+Just install the latest DYMO Label software and you're done 
+(e.g. https://download.dymo.com/dymo/Software/Mac/DLS8Setup.8.7.4.dmg).
+
+### Windows
+
+Just install the latest DYMO Connect software and you're done (e.g. https://download.dymo.com/dymo/Software/DYMO%20Connect%201.4.2/DCDSetup1.4.2.82.exe).
